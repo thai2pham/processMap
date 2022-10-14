@@ -1,2 +1,2 @@
 # processMap
-genprocess Map to plantuml with the result of checking status
+plantuml for process Map with the result of checking status
