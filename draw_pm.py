@@ -174,23 +174,80 @@ class DrawProcessMap :
 
     def drawMap(self):
         # https://plantuml.com/ko/use-case-diagram
+        totalhdr = ''
+        totalhdr += "```plantuml\n"
+        totalhdr += '@startuml total.png\n'
+        totalhdr += 'left to right direction' + '\n'
+        totalhdr += '''
+skinparam usecase {
+    BackgroundColor<< Execution >> YellowGreen
+    BorderColor<< Execution >> YellowGreen
+
+    BackgroundColor<< Email >> LightSeaGreen
+    BorderColor<< Email >> LightSeaGreen
+
+    ArrowColor Olive
+}
+        '''
+        for g in self.D['Group']:
+            if g == 'None':
+                continue
+            totalhdr += 'package ' + g + '{\n'
+            gSet = set()
+            for g2 in self.D['Group'][g]:
+                for g3 in self.D['Group'][g][g2]:
+                    if g3 not in gSet:
+                        if g == 'email':
+                            totalhdr += '    usecase (' + g3 + ') as (' + g3 + ') << Email >>\n'
+                        else:
+                            totalhdr += '    usecase (' + g3 + ') as (' + g3 + ')\n'
+                        gSet.add(g3)
+            totalhdr += '}\n'
+        totalbody = ''
         for p in self.D['Project']:
-            plantuml = ''
-            plantuml += "```plantuml\n"
-            plantuml += '@startuml ' + p + '.png\n'
-            plantuml += 'left to right direction' + '\n'
+            plantumlhdr = ''
+            plantumlhdr += "```plantuml\n"
+            plantumlhdr += '@startuml ' + p + '.png\n'
+            plantumlhdr += 'left to right direction' + '\n'
+            plantumlbody = ''
             for k in self.D['Project'][p]['Key']:
+                totalbody += '  rectangle ' + p + '{\n'
+                usecaseExecutionSet = set()
                 for f in self.D['Project'][p]['Key'][k]['From']:
                     for n in self.D['Project'][p]['Key'][k]['From'][f]['_name']:
-                        plantuml += '    (' + n + ') --> (' + self.D['Project'][p]['Key'][k]['From'][f]['_execution'] + ')\n'
+                        plantumlbody += '    (' + n + ') --> (' + self.D['Project'][p]['Key'][k]['From'][f]['_execution'] + ') : ' + self.D['Project'][p]['Key'][k]['From'][f]['Description'] + '\n'
+                        usecaseExecutionSet.add(self.D['Project'][p]['Key'][k]['From'][f]['_execution'])
                 for f in self.D['Project'][p]['Key'][k]['To']:
                     for n in self.D['Project'][p]['Key'][k]['To'][f]['_name']:
-                        plantuml += '    (' + self.D['Project'][p]['Key'][k]['To'][f]['_execution'] + ') --> (' + n + ')\n'
-            plantuml += '@enduml' + '\n'
-            plantuml += "```\n"
+                        plantumlbody += '    (' + self.D['Project'][p]['Key'][k]['To'][f]['_execution'] + ') --> (' + n + ') : ' + self.D['Project'][p]['Key'][k]['To'][f]['Description'] + '\n'
+                        usecaseExecutionSet.add(self.D['Project'][p]['Key'][k]['To'][f]['_execution'])
+                for u in usecaseExecutionSet:
+                    totalbody += '    usecase (' + u  + ') as (' + u + ') << Execution >>\n'
+                for f in self.D['Project'][p]['Key'][k]['From']:
+                    for n in self.D['Project'][p]['Key'][k]['From'][f]['_name']:
+                        totalbody += '    (' + n + ') --> (' + self.D['Project'][p]['Key'][k]['From'][f]['_execution'] + ') : ' + self.D['Project'][p]['Key'][k]['From'][f]['Description'] + '\n'
+                for f in self.D['Project'][p]['Key'][k]['To']:
+                    for n in self.D['Project'][p]['Key'][k]['To'][f]['_name']:
+                        totalbody += '    (' + self.D['Project'][p]['Key'][k]['To'][f]['_execution'] + ') --> (' + n + ') : ' + self.D['Project'][p]['Key'][k]['To'][f]['Description'] + '\n'
+                totalbody += '  }\n'
+            plantumltail = ''
+            plantumltail += '@enduml' + '\n'
+            plantumltail += "```\n"
             f = open(p + '.md','w')
-            f.write(plantuml)
+            f.write(plantumlhdr + plantumlbody + plantumltail)
             f.close()
+        totaltail = ''
+        totaltail += '@enduml' + '\n'
+        totaltail += "```\n"
+        f = open('total.md','w')
+        # usecaseExecutionHdr = ''
+        # for u in usecaseExecutionSet:
+        #     usecaseExecutionHdr += 'usecase (' + u + ')\n'
+            # usecaseExecutionHdr += 'usecase (' + u + ') << execution >> \n'
+            # usecaseExecutionHdr += '(' + u + ') as (' + u + ') << Execution >> \n'
+        # f.write(totalhdr + usecaseExecutionHdr + totalbody + totaltail)
+        f.write(totalhdr + totalbody + totaltail)
+        f.close()
 
  
 
@@ -220,67 +277,6 @@ def traverseFD(f,vv,start:str):
 def traverseFile(filename:str,v,start:str,att):
     with open(filename, att, encoding='utf-8', errors='ignore') as f:
         traverseFD(f,v,start)
-
-
-# def traverseFD(f,vv,start:str):
-#     print(start,":",file=f)
-#     if isinstance(vv, dict):
-#         for k, v in vv.items():
-#             traverseFD(f,v,start + ":key=" + k )
-#     elif isinstance(vv, (list, tuple)):
-#         for i, x in enumerate(vv):
-#             traverseFD(f,x,start + ":idx=" + str(i) )
-#     else :
-#         print(start ,  ":value=", vv , file=f)
-
-# def traverseFile(filename:str,v,start:str):
-#     f = open(filename, "w")
-#     traverseFD(f,v,start)
-#     f.close()
-
-
-def transform(obj):
-    _type = type(obj)
-    if _type == tuple: _type = list
-    rslt = _type()
-    if isinstance(obj, dict):
-        for k, v in obj.items():
-            rslt[k] = transform(v)
-    elif isinstance(obj, (list, tuple)):
-        for x in obj:
-            rslt.append(transform(x))
-    elif isinstance(obj, set):
-        for x in obj:
-            rslt.add(transform(x))
-    elif isinstance(obj, (int)):
-        rslt = hex(obj)
-    else:
-        rslt = obj
-
-    return rslt
-
-#element = transform(element)
-
-def objwalk(obj, path=(), memo=None):
-    if memo is None:
-        memo = set()
-    iterator = None
-    if isinstance(obj, dict):
-        iterator = iteritems
-    elif isinstance(obj, (list, set)) and not isinstance(obj, string_types):
-        iterator = enumerate
-    if iterator:
-        if id(obj) not in memo:
-            memo.add(id(obj))
-            for path_component, value in iterator(obj):
-                if isinstance(value, tuple):
-                    obj[path_component] = value = list(value)
-                for result in objwalk(value, path + (path_component,), memo):
-                    yield result
-            memo.remove(id(obj))
-    else:
-        yield path, obj
-
 
 if (__name__ == "__main__"):
 

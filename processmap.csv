@@ -6,7 +6,7 @@ info-doxygen,perl-data:info-doxygen.gv,info_doxygen.pl,log:service-[name].log,,p
 AutoTest_Cmd,common_job_for_upload.sh,project:info-doxygen,log:__result.txt,,((((for each)) _AND_ PP)),,,,,pass,fail,text,,1,,check whether it is the right doxygen comments
 intuitiveui,TestResultFile.txt,intuitiveui.py,"email : [$PROJECT_NAME] DailyTest report ${DATE_STR} ",,,,,,,,,,,,,result to html table
 AutoTest_Cmd,job_for_email_report.sh,project:intuitiveui,email : [$PROJECT_NAME] DailyTest report ${DATE_STR},,,,,,,,,,,1,,result to html table
-taf_sldd_statistics,"/var/www/html/DailyTest , data:Alltestcase.txt , data:test_coverage_*.csv , data:TestResultFile.txt , sldd_history.csv",get_sldd.py,"sldd_history.csv , email : [TIGER-INFRA:TAF SLDD STATISTICS] sldd status for each model",,,,,,,,,,,1,,TAF LLDD test report
+taf_sldd_statistics,"/var/www/html/DailyTest , data:Alltestcase.txt , data:test_coverage_*.csv , data:TestResultFile.txt , sldd_history.csv",get_sldd.py,"sldd_history.csv , email : [TIGER-INFRA TAF SLDD STATISTICS] sldd status for each model",,,,,,,,,,,1,,TAF SLDD test report
 swit,TestResult_SWIT.txt,swit.py,"email : TAF SLDD result,TestResult_SWIT.html",,,,,,,,,,,1,,TestResult_SWIT.txt
 weekly_work_report_from_jira,"VLM , CodeBeamber",get_work.py,email : [Weekly Report] your 7 days weekly report for your assigned,,,,,,,,,,,5,,weekly report for developers from VLM and CodeBeamer
 ,,,,,,,,,,,,,,,,
