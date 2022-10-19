@@ -1,4 +1,4 @@
-```plantuml
+```puml
 @startuml total.png
 left to right direction
 
