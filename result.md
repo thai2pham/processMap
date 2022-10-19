@@ -1,4 +1,4 @@
-```puml
+
 @startuml total.png
 left to right direction
 
@@ -86,4 +86,3 @@ package data{
     (get_work.py) --> ([Weekly Report] your 7 days weekly report for your assigned) : weekly report for developers from VLM and CodeBeamer
   }
 @enduml
-```
