@@ -23,8 +23,11 @@ from email.mime.text import MIMEText
 debug = 0
 
 class DrawProcessMap :
-    def __init__(self , input):
+    def __init__(self , input,id,passwd):
         self.input = input
+        self.id = id
+        self.passwd = passwd
+        os.makedirs('server-data',exist_ok=True)
         self.D = {}
         self.Cnt = 1
         # key : ```from~~~execution~~~to```
@@ -57,17 +60,53 @@ class DrawProcessMap :
         self.D['Project'] = {}
         self.D['Group'] = {}
         self.D['Key'] = {}
+        self.D['Replace'] = {}
         with open(self.input,'r', newline='') as csvfile:
             reader = csv.DictReader(csvfile)
             print('fieldnames:',reader.fieldnames)
             for r in reader:
                 if 'Project' not in r:
-                    print("Project column should be exist in this csv file.")
+                    print("Error : Project column should be exist in this csv file.",r)
                     quit(4)
                 tmp = r['Project'].strip()
                 if not tmp or tmp[0] == '#':
                     continue
-                self.setValue(r)
+                if r['Replace']:
+                    replaceList = [i for i in r['Replace'].strip().split(',') if i.strip()]
+                    for replaceItem in replaceList:
+                        self.readReplaceFile(replaceItem.strip())
+                    print('self.d[Replace]:',self.D['Replace'])
+                    rList = [r]
+                    rResult = []
+                    for replaceItem in replaceList:   # cmu-project
+                        for row in rList:
+                            # print("1.row:",row)
+                            for element in self.D['Replace'][replaceItem]:
+                                rowNew = {}
+                                for field in row:
+                                    rowNew[field] = row[field].replace('['+ replaceItem +']',element)
+                                rResult.append(rowNew)
+                                # print("2.rowNew:",rowNew)
+                        rList = rResult
+                        rResult = []
+                        # print(replaceItem, ': rList :',rList)
+                    for row in rList:
+                        self.setValue(row)
+                else:
+                    self.setValue(r)
+        traverseFile("data.py",self.D,'D',"w")
+
+    def readReplaceFile(self,filename):
+        if filename in self.D['Replace']:
+            return
+        else:
+            self.D['Replace'][filename] = []
+        with open(filename + '.list' , 'r', encoding='utf-8', errors='ignore') as f:
+            contents = f.readlines()
+            a = [i.strip() for i in contents if i.strip()]
+            for s in a:
+                self.D['Replace'][filename].append(s)
+        return
 
     def getProjectAndGroupAndInit(self,target,r):
         kk = r['From'].strip() + '~~~' + r['Execution'].strip() + '~~~' + r['To'].strip()
@@ -121,6 +160,9 @@ class DrawProcessMap :
             self.D['Project'][project]['Key'][key][target][f]['_group'] = _group
             self.D['Project'][project]['Key'][key][target][f]['_name'] = _name
             self.D['Project'][project]['Key'][key][target][f]['_execution'] = r['Execution']
+            if not r['Execution']:
+                print('Error : Execution field should not be null.' , r)
+                quit(4)
         for s in list(r.keys()):
             self.D['Project'][project]['Key'][key][target][f][s] = r[s]
             if s.find('CheckPoint') >= 0:
@@ -134,16 +176,44 @@ class DrawProcessMap :
         p , f , fg , fn , key = self.getProjectAndGroupAndInit('From',r)
         # p , e , eg , en , key = self.getProjectAndGroupAndInit('Execution',r)
         p , t , tg , tn , key = self.getProjectAndGroupAndInit('To',r)
-        traverseFile("sample.py",self.D,'D',"w")
 
-        # fsc = r['FromSuccessCheckPoint'].strip()
-        # self.parseCheckPoint(fsc,r,'FromSuccessCheckPoint')
-        # ffc = r['FromFailCheckPoint'].strip()
-        # self.parseCheckPoint(ffc,r,'FromFailCheckPoint')
-        # tsc = r['ToSuccessCheckPoint'].strip()
-        # self.parseCheckPoint(tsc,r,'ToSuccessCheckPoint')
-        # tfc = r['ToFailCheckPoint'].strip()
-        # self.parseCheckPoint(tfc,r,'ToFailCheckPoint')
+        row = r
+        dateRe = re.compile('(?P<date>(?P<year>20[0-9]+)-(?P<month>[0-9]+)-(?P<day>[0-9]+))')
+        for field in row:
+            if field in ['FromLocation','ToLocation']:
+                a = row[field].strip().split(':')
+                if a[0].strip() == 'ssh':
+                    hostname = a[1].strip()
+                    originFileName = a[2].strip()
+                    targetFileName = 'server-data/'+field+'.'+originFileName.replace('/','.')
+                    if row['Periodic']:
+                        s = "sshpass -p " + self.passwd + " ssh -o StrictHostKeyChecking=no " + self.id + '@' + hostname + ' ' + '''"stat -c '%y' ''' + originFileName + '"'
+                        print()
+                        print(s)
+                        # os.system(s)
+                        out = os.popen(s).read()
+                        print('out:',out.strip())
+                        grp = dateRe.search(out)
+                        if grp:
+                            year = grp.group('year')
+                            month = grp.group('month')
+                            day = grp.group('day')
+                            file_date = datetime.datetime(int(year),int(month),int(day)) - datetime.timedelta(days=int(r['Periodic']))
+                            now_date = datetime.datetime.now() 
+                            print('file:',file_date,'old:',now_date,grp.group('date'))
+                            if file_date < now_date:  # ok
+                                tmp = field.replace('Location','')
+                                r[tmp+'LastTime'] = grp.group('date')
+                                print('date:',r[tmp+'LastTime'])
+                                s = "sshpass -p " + self.passwd + " scp -o StrictHostKeyChecking=no " + self.id + '@' + hostname + ':' + originFileName + ' ' + targetFileName
+                                print()
+                                print(s)
+                                os.system(s)
+                                self.analysisLogFile(targetFileName,r)
+
+    def analysisLogFile(self,targetFileName,r):
+        
+        return
 
     def parseCheckPoint(self,sc,r,msg):
         idx = 0
@@ -159,6 +229,8 @@ class DrawProcessMap :
                         continue
                     else:
                         c = b1.split('_AND_')
+                        cCom = [ 1]  * len(c)
+                        print('cCom:',cCom)
                         for c1 in c:
                             if c1.strip() == '':
                                 continue
@@ -192,7 +264,7 @@ skinparam usecase {
         for g in self.D['Group']:
             if g == 'None':
                 continue
-            totalhdr += 'package ' + g + '{\n'
+            totalhdr += 'package ' + g + ' {\n'
             gSet = set()
             for g2 in self.D['Group'][g]:
                 for g3 in self.D['Group'][g][g2]:
@@ -210,9 +282,9 @@ skinparam usecase {
             plantumlhdr += '@startuml ' + p + '.png\n'
             plantumlhdr += 'left to right direction' + '\n'
             plantumlbody = ''
+            totalbody += '  rectangle ' + p + ' {\n'
+            usecaseExecutionSet = set()
             for k in self.D['Project'][p]['Key']:
-                totalbody += '  rectangle ' + p + '{\n'
-                usecaseExecutionSet = set()
                 for f in self.D['Project'][p]['Key'][k]['From']:
                     for n in self.D['Project'][p]['Key'][k]['From'][f]['_name']:
                         plantumlbody += '    (' + n + ') --> (' + self.D['Project'][p]['Key'][k]['From'][f]['_execution'] + ') : ' + self.D['Project'][p]['Key'][k]['From'][f]['Description'] + '\n'
@@ -221,15 +293,16 @@ skinparam usecase {
                     for n in self.D['Project'][p]['Key'][k]['To'][f]['_name']:
                         plantumlbody += '    (' + self.D['Project'][p]['Key'][k]['To'][f]['_execution'] + ') --> (' + n + ') : ' + self.D['Project'][p]['Key'][k]['To'][f]['Description'] + '\n'
                         usecaseExecutionSet.add(self.D['Project'][p]['Key'][k]['To'][f]['_execution'])
-                for u in usecaseExecutionSet:
-                    totalbody += '    usecase (' + u  + ') as (' + u + ') << Execution >>\n'
+            for u in usecaseExecutionSet:
+                totalbody += '    usecase (' + u  + ') as (' + u + ') << Execution >>\n'
+            for k in self.D['Project'][p]['Key']:
                 for f in self.D['Project'][p]['Key'][k]['From']:
                     for n in self.D['Project'][p]['Key'][k]['From'][f]['_name']:
                         totalbody += '    (' + n + ') --> (' + self.D['Project'][p]['Key'][k]['From'][f]['_execution'] + ') : ' + self.D['Project'][p]['Key'][k]['From'][f]['Description'] + '\n'
                 for f in self.D['Project'][p]['Key'][k]['To']:
                     for n in self.D['Project'][p]['Key'][k]['To'][f]['_name']:
                         totalbody += '    (' + self.D['Project'][p]['Key'][k]['To'][f]['_execution'] + ') --> (' + n + ') : ' + self.D['Project'][p]['Key'][k]['To'][f]['Description'] + '\n'
-                totalbody += '  }\n'
+            totalbody += '  }\n'
             plantumltail = ''
             plantumltail += '@enduml' + '\n'
             plantumltail += "```\n"
@@ -289,6 +362,19 @@ if (__name__ == "__main__"):
     #group.add_argument("-v", "--verbose", action="store_true")
     #group.add_argument("-q", "--quiet", action="store_true")
 
+    parser.add_argument(
+        '--authname',
+        default='None',
+        metavar="<id>",
+        type=str,
+        help='host id  ex) cheoljoo.lee    without @')
+
+    parser.add_argument(
+        '--authpasswd',
+        default='None',
+        metavar="<passwd>",
+        type=str,
+        help='host passwd')
 
     parser.add_argument( '--input', default='processmap.csv',metavar="<str>", type=str, help='input csv file')
 
@@ -296,5 +382,5 @@ if (__name__ == "__main__"):
 
 
 
-    dpm = DrawProcessMap(input= args.input)
+    dpm = DrawProcessMap(input= args.input,id=args.authname,passwd=args.authpasswd)
     dpm.drawMap()
