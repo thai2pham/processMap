@@ -167,7 +167,7 @@ class DrawProcessMap :
             self.D['Project'][project]['Key'][key][target][f][s] = r[s]
             if s.find('CheckPoint') >= 0:
                 sc = r[s].strip()
-                self.D['Project'][project]['Key'][key][target][f]['_' + s] = self.parseCheckPoint(sc,r,s)
+                self.D['Project'][project]['Key'][key][target][f]['_' + s] , self.D['Project'][project]['Key'][key][target][f]['_Op_' + s]  = self.parseCheckPoint(sc,r,s)
 
         return (project,f,_group,_name,key)
 
@@ -181,43 +181,318 @@ class DrawProcessMap :
         dateRe = re.compile('(?P<date>(?P<year>20[0-9]+)-(?P<month>[0-9]+)-(?P<day>[0-9]+))')
         for field in row:
             if field in ['FromLocation','ToLocation']:
+                direction = field.replace('Location','')
+                # print(r[direction+'Type'])
+                if r[direction+'Type'] not in ['text','binary']:
+                    continue
+                if r[direction+'Location'].strip() == '':
+                    continue
                 a = row[field].strip().split(':')
                 if a[0].strip() == 'ssh':
                     hostname = a[1].strip()
                     originFileName = a[2].strip()
                     targetFileName = 'server-data/'+field+'.'+originFileName.replace('/','.')
-                    if row['Periodic']:
-                        s = "sshpass -p " + self.passwd + " ssh -o StrictHostKeyChecking=no " + self.id + '@' + hostname + ' ' + '''"stat -c '%y' ''' + originFileName + '"'
-                        print()
-                        print(s)
-                        # os.system(s)
-                        out = os.popen(s).read()
-                        print('out:',out.strip())
-                        grp = dateRe.search(out)
-                        if grp:
-                            year = grp.group('year')
-                            month = grp.group('month')
-                            day = grp.group('day')
+                    s = "sshpass -p " + self.passwd + " ssh -o StrictHostKeyChecking=no " + self.id + '@' + hostname + ' ' + '''"stat -c '%y' ''' + originFileName + '"'
+                    print()
+                    print(s)
+                    # os.system(s)
+                    out = os.popen(s).read()
+                    print('out:',out.strip())
+                    grp = dateRe.search(out)
+                    if grp:
+                        year = grp.group('year')
+                        month = grp.group('month')
+                        day = grp.group('day')
+                        if row['Periodic'] and int(row['Periodic']) > 0:
                             file_date = datetime.datetime(int(year),int(month),int(day)) - datetime.timedelta(days=int(r['Periodic']))
                             now_date = datetime.datetime.now() 
                             print('file:',file_date,'old:',now_date,grp.group('date'))
                             if file_date < now_date:  # ok
-                                tmp = field.replace('Location','')
-                                r[tmp+'LastTime'] = grp.group('date')
-                                print('date:',r[tmp+'LastTime'])
+                                r[direction+'LastTime'] = grp.group('date')
+                                print('date:',r[direction+'LastTime'])
                                 s = "sshpass -p " + self.passwd + " scp -o StrictHostKeyChecking=no " + self.id + '@' + hostname + ':' + originFileName + ' ' + targetFileName
-                                print()
                                 print(s)
                                 os.system(s)
-                                self.analysisLogFile(targetFileName,r)
+                                project = r['Project'].strip()
+                                keyStr = r['From'].strip() + '~~~' + r['Execution'].strip() + '~~~' + r['To'].strip() 
+                                key = str(self.D['Key'][keyStr])
+                                dir = r[direction]
+                                target = '_' + direction + 'TargetExist'
+                                self.D['Project'][project]['Key'][key][direction][dir][target]  = True
+                                target = '_' + direction + 'TargetExpired'
+                                self.D['Project'][project]['Key'][key][direction][dir][target]  = False
+                                target = '_' + direction + 'TargetFileName'
+                                self.D['Project'][project]['Key'][key][direction][dir][target]  = targetFileName
+                                self.analysisLogFile(targetFileName,direction,r)
+                            else:
+                                print('time expired')
+                                project = r['Project'].strip()
+                                keyStr = r['From'].strip() + '~~~' + r['Execution'].strip() + '~~~' + r['To'].strip() 
+                                key = str(self.D['Key'][keyStr])
+                                dir = r[direction]
+                                target = '_' + direction + 'TargetExist'
+                                self.D['Project'][project]['Key'][key][direction][dir][target]  = True
+                                target = '_' + direction + 'TargetExpired'
+                                self.D['Project'][project]['Key'][key][direction][dir][target]  = True
+                                target = '_' + direction + 'TargetFileName'
+                                self.D['Project'][project]['Key'][key][direction][dir][target]  = ""
+                        else:  # 시간 상관없을때
+                            print('no periodic')
+                            r[direction+'LastTime'] = grp.group('date')
+                            print('date:',r[direction+'LastTime'])
+                            s = "sshpass -p " + self.passwd + " scp -o StrictHostKeyChecking=no " + self.id + '@' + hostname + ':' + originFileName + ' ' + targetFileName
+                            print()
+                            print(s)
+                            os.system(s)
+                            project = r['Project'].strip()
+                            keyStr = r['From'].strip() + '~~~' + r['Execution'].strip() + '~~~' + r['To'].strip() 
+                            key = str(self.D['Key'][keyStr])
+                            dir = r[direction]
+                            target = '_' + direction + 'TargetExist'
+                            self.D['Project'][project]['Key'][key][direction][dir][target]  = True
+                            target = '_' + direction + 'TargetExpired'
+                            self.D['Project'][project]['Key'][key][direction][dir][target]  = False
+                            target = '_' + direction + 'TargetFileName'
+                            self.D['Project'][project]['Key'][key][direction][dir][target]  = targetFileName
+                            self.analysisLogFile(targetFileName,direction,r)
+                    else :  # 파일이 없을때
+                        print('file not exist')
+                        project = r['Project'].strip()
+                        keyStr = r['From'].strip() + '~~~' + r['Execution'].strip() + '~~~' + r['To'].strip() 
+                        key = str(self.D['Key'][keyStr])
+                        dir = r[direction]
+                        target = '_' + direction + 'TargetExist'
+                        self.D['Project'][project]['Key'][key][direction][dir][target]  = False
+                        target = '_' + direction + 'TargetExpired'
+                        self.D['Project'][project]['Key'][key][direction][dir][target]  = False
+                        target = '_' + direction + 'TargetFileName'
+                        self.D['Project'][project]['Key'][key][direction][dir][target]  = ""
+                else:
+                    s = '''stat -c '%y' ''' + r[direction+'Location'].strip()
+                    print()
+                    print(s)
+                    out = os.popen(s).read()
+                    print('out:',out.strip())
+                    grp = dateRe.search(out)
+                    if grp:
+                        year = grp.group('year')
+                        month = grp.group('month')
+                        day = grp.group('day')
+                        if row['Periodic'] and int(row['Periodic']) > 0:
+                            file_date = datetime.datetime(int(year),int(month),int(day)) - datetime.timedelta(days=int(r['Periodic']))
+                            now_date = datetime.datetime.now() 
+                            print('file:',file_date,'old:',now_date,grp.group('date'))
+                            if file_date < now_date:  # ok
+                                r[direction+'LastTime'] = grp.group('date')
+                                print('date:',r[direction+'LastTime'])
+                                project = r['Project'].strip()
+                                keyStr = r['From'].strip() + '~~~' + r['Execution'].strip() + '~~~' + r['To'].strip() 
+                                key = str(self.D['Key'][keyStr])
+                                dir = r[direction]
+                                target = '_' + direction + 'TargetExist'
+                                self.D['Project'][project]['Key'][key][direction][dir][target]  = True
+                                target = '_' + direction + 'TargetExpired'
+                                self.D['Project'][project]['Key'][key][direction][dir][target]  = False
+                                target = '_' + direction + 'TargetFileName'
+                                self.D['Project'][project]['Key'][key][direction][dir][target]  = r[direction+'Location']
+                                self.analysisLogFile(r[direction+'Location'],direction,r)
+                            else:
+                                project = r['Project'].strip()
+                                keyStr = r['From'].strip() + '~~~' + r['Execution'].strip() + '~~~' + r['To'].strip() 
+                                key = str(self.D['Key'][keyStr])
+                                dir = r[direction]
+                                target = '_' + direction + 'TargetExist'
+                                self.D['Project'][project]['Key'][key][direction][dir][target]  = True
+                                target = '_' + direction + 'TargetExpired'
+                                self.D['Project'][project]['Key'][key][direction][dir][target]  = True
+                                target = '_' + direction + 'TargetFileName'
+                                self.D['Project'][project]['Key'][key][direction][dir][target]  = ""
+                        else:  # 시간 상관없을때
+                            r[direction+'LastTime'] = grp.group('date')
+                            print('date:',r[direction+'LastTime'])
+                            project = r['Project'].strip()
+                            keyStr = r['From'].strip() + '~~~' + r['Execution'].strip() + '~~~' + r['To'].strip() 
+                            key = str(self.D['Key'][keyStr])
+                            dir = r[direction]
+                            target = '_' + direction + 'TargetExist'
+                            self.D['Project'][project]['Key'][key][direction][dir][target]  = True
+                            target = '_' + direction + 'TargetExpired'
+                            self.D['Project'][project]['Key'][key][direction][dir][target]  = False
+                            target = '_' + direction + 'TargetFileName'
+                            self.D['Project'][project]['Key'][key][direction][dir][target]  = r[direction+'Location']
+                            self.analysisLogFile(r[direction+'Location'],direction,r)
+                    else:   # file이 없을때
+                        project = r['Project'].strip()
+                        keyStr = r['From'].strip() + '~~~' + r['Execution'].strip() + '~~~' + r['To'].strip() 
+                        key = str(self.D['Key'][keyStr])
+                        dir = r[direction]
+                        target = '_' + direction + 'TargetExist'
+                        self.D['Project'][project]['Key'][key][direction][dir][target]  = False
+                        target = '_' + direction + 'TargetExpired'
+                        self.D['Project'][project]['Key'][key][direction][dir][target]  = False
+                        target = '_' + direction + 'TargetFileName'
+                        self.D['Project'][project]['Key'][key][direction][dir][target]  = ""
+                            
 
-    def analysisLogFile(self,targetFileName,r):
-        
+    def analysisLogFile(self,targetFileName,direction,r):
+        '''
+        get target file from server or local directory
+        it runs when ToLocation or FromLocation have value.
+        analyze the file with ToSuccessCheckPoint  and ToFailCheckPoint of r
+        these CheckPoint split in _To... _From... _Op_To... _Op_From...
+        '''
+        print('analysisLogFile:',targetFileName,direction)
+        project = r['Project'].strip()
+        keyStr = r['From'].strip() + '~~~' + r['Execution'].strip() + '~~~' + r['To'].strip() 
+        key = str(self.D['Key'][keyStr])
+        dir = r[direction]
+        ds = self.D['Project'][project]['Key'][key][direction][dir]
+
+        showCheck = direction+'ShowCheckPoint'
+        showCheckList = '_'+direction+'ShowCheckPoint'
+        showOpCheckList = '_Op_'+direction+'ShowCheckPoint'
+        showResult = '_result_'+direction+'ShowCheckPoint'
+        # showFinalResult = '_final_result_'+direction+'ShowCheckPoint'
+        if ds[showCheck].strip() != '':
+            print(showCheck,ds[showCheck])
+            with open(targetFileName , 'r', encoding='utf-8', errors='ignore') as f:
+                contents = f.readlines()
+                pos = 0
+                # show checkpoint
+                # order check
+                foundFlag = False
+                # ds[showResult] = ds[showCheck]
+                msg = ''
+                for i,v in enumerate(ds[showCheckList]):
+                    for line in range(pos,len(contents)):
+                        if contents[line].find(v) >= 0:  # found
+                            foundFlag = True
+                            msg += contents[line]
+                            if i+1 < len(ds[showOpCheckList]):
+                                if ds[showOpCheckList][i+1].find('SEQ') < 0:  # not SEQ
+                                    pos = 0
+                                else :
+                                    pos = line
+                            else:
+                                pos = 0
+                            break
+                ds[showResult] = msg
+                #     ds[showResult] = ds[showResult].replace(v,str(foundFlag))
+                #     print(v,ds[showResult])
+                # ds[showResult] = ds[showResult].replace('_AND_','and')
+                # ds[showResult] = ds[showResult].replace('_SEQAND_','and')
+                # ds[showResult] = ds[showResult].replace('_OR_','or')
+                # ds[showResult] = ds[showResult].replace('_SEQOR_','or')
+                # ds[showFinalResult] = eval(ds[showResult])
+                # print(ds[showResult])
+                # print(eval(ds[showResult]))
+
+        failCheck = direction+'FailCheckPoint'
+        failCheckList = '_'+direction+'FailCheckPoint'
+        failOpCheckList = '_Op_'+direction+'FailCheckPoint'
+        failResult = '_result_'+direction+'FailCheckPoint'
+        failFinalResult = '_final_result_'+direction+'FailCheckPoint'
+        if ds[failCheck].strip() != '':
+            print(failCheck,ds[failCheck])
+            with open(targetFileName , 'r', encoding='utf-8', errors='ignore') as f:
+                contents = f.readlines()
+                pos = 0
+                # fail checkpoint
+                    # D['Project']['info-doxygen']['Key']['3']['From']['perl-data:info-doxygen.gv']['FromFailCheckPoint'] = '''((fail _AND_ failure)) _OR_ over str'''
+                    # D['Project']['info-doxygen']['Key']['3']['From']['perl-data:info-doxygen.gv']['_FromFailCheckPoint'][list:0] = '''fail'''
+                    # D['Project']['info-doxygen']['Key']['3']['From']['perl-data:info-doxygen.gv']['_FromFailCheckPoint'][list:1] = '''failure'''
+                    # D['Project']['info-doxygen']['Key']['3']['From']['perl-data:info-doxygen.gv']['_FromFailCheckPoint'][list:2] = '''over str'''
+                    # D['Project']['info-doxygen']['Key']['3']['From']['perl-data:info-doxygen.gv']['_Op_FromFailCheckPoint'][list:0] = '''_AND_'''
+                    # D['Project']['info-doxygen']['Key']['3']['From']['perl-data:info-doxygen.gv']['_Op_FromFailCheckPoint'][list:1] = '''_AND_'''
+                    # D['Project']['info-doxygen']['Key']['3']['From']['perl-data:info-doxygen.gv']['_Op_FromFailCheckPoint'][list:2] = '''_OR_'''
+                # order check
+                for i,v in enumerate(ds[failCheckList]):
+                    if v in ds[failCheckList][i+1:]:
+                        print("Error : your CheckPoint order is wrong:", v , 'should not be prior order.',r)
+                        quit(4)
+                foundFlag = False
+                ds[failResult] = ds[failCheck]
+                for i,v in enumerate(ds[failCheckList]):
+                    for line in range(pos,len(contents)):
+                        if contents[line].find(v) >= 0:  # found
+                            foundFlag = True
+                            if i+1 < len(ds[failOpCheckList]):
+                                if ds[failOpCheckList][i+1].find('SEQ') < 0:  # not SEQ
+                                    pos = 0
+                                else :
+                                    pos = line
+                            else:
+                                pos = 0
+                            break
+                    ds[failResult] = ds[failResult].replace(v,str(foundFlag))
+                    print(v,ds[failResult])
+                ds[failResult] = ds[failResult].replace('_AND_','and')
+                ds[failResult] = ds[failResult].replace('_SEQAND_','and')
+                ds[failResult] = ds[failResult].replace('_OR_','or')
+                ds[failResult] = ds[failResult].replace('_SEQOR_','or')
+                ds[failFinalResult] = eval(ds[failResult])
+                print(ds[failResult])
+                print(eval(ds[failResult]))
+
+                if ds[failFinalResult]:
+                    return
+
+            # success checkpoint
+                # D['Project']['UTS']['Key']['11']['To']['bmw_icon_nad_log_UTS_LOG_health-service']['ToSuccessCheckPoint'] = '''Overall coverage rate: _SEQAND_ [100%] Built target all_coverage'''
+                # D['Project']['UTS']['Key']['11']['To']['bmw_icon_nad_log_UTS_LOG_health-service']['_ToSuccessCheckPoint'][list:0] = '''Overall coverage rate:'''
+                # D['Project']['UTS']['Key']['11']['To']['bmw_icon_nad_log_UTS_LOG_health-service']['_ToSuccessCheckPoint'][list:1] = '''[100%] Built target all_coverage'''
+                # D['Project']['UTS']['Key']['11']['To']['bmw_icon_nad_log_UTS_LOG_health-service']['_Op_ToSuccessCheckPoint'][list:0] = '''_SEQAND_'''
+                # D['Project']['UTS']['Key']['11']['To']['bmw_icon_nad_log_UTS_LOG_health-service']['_Op_ToSuccessCheckPoint'][list:1] = '''_SEQAND_'''
+        successCheck = direction+'SuccessCheckPoint'
+        successCheckList = '_'+direction+'SuccessCheckPoint'
+        successOpCheckList = '_Op_'+direction+'SuccessCheckPoint'
+        successResult = '_result_'+direction+'SuccessCheckPoint'
+        successFinalResult = '_final_result_'+direction+'SuccessCheckPoint'
+        if ds[successCheck].strip() != '':
+            print(successCheck,ds[successCheck])
+            with open(targetFileName , 'r', encoding='utf-8', errors='ignore') as f:
+                contents = f.readlines()
+                pos = 0
+                # order check
+                for i,v in enumerate(ds[successCheckList]):
+                    if v in ds[successCheckList][i+1:]:
+                        print("Error : your CheckPoint order is wrong:", v , 'should not be prior order.',r)
+                        quit(4)
+                foundFlag = False
+                ds[successResult] = ds[successCheck]
+                for i,v in enumerate(ds[successCheckList]):
+                    for line in range(pos,len(contents)):
+                        if contents[line].find(v) >= 0:  # found
+                            foundFlag = True
+                            if i+1 < len(ds[successOpCheckList]):
+                                if ds[successOpCheckList][i+1].find('SEQ') < 0:  # not SEQ
+                                    pos = 0
+                                else :
+                                    pos = line
+                            else:
+                                pos = 0
+                            break
+                    ds[successResult] = ds[successResult].replace(v,str(foundFlag))
+                    print(v,ds[successResult])
+                ds[successResult] = ds[successResult].replace('_AND_','and')
+                ds[successResult] = ds[successResult].replace('_SEQAND_','and')
+                ds[successResult] = ds[successResult].replace('_OR_','or')
+                ds[successResult] = ds[successResult].replace('_SEQOR_','or')
+                ds[successFinalResult] = eval(ds[successResult])
+                print(ds[successResult])
+                print(eval(ds[successResult]))
+
         return
 
     def parseCheckPoint(self,sc,r,msg):
         idx = 0
         ans = []
+        ansOp = []
+        bitOp = ''
+        oldAndOp = ''
+        oldOrOp = ''
+        oldSeqAndOp = ''
+        oldSeqOrOp = ''
         a = sc.split('((')
         for a1 in a:
             if a1.strip() == '':
@@ -229,20 +504,49 @@ class DrawProcessMap :
                         continue
                     else:
                         c = b1.split('_AND_')
-                        cCom = [ 1]  * len(c)
-                        print('cCom:',cCom)
+                        if len(c) > 1 :
+                            oldAndOp = bitOp
+                            bitOp = '_AND_'
                         for c1 in c:
                             if c1.strip() == '':
                                 continue
                             else :
                                 d = c1.split('_OR_')
+                                if  len(d) > 1:
+                                    oldOrOp = bitOp
+                                    bitOp = '_OR_'
                                 for d1 in d:
                                     if d1.strip() == '':
                                         continue
                                     else:
-                                        ans.append(d1.strip())
-        # print(msg , "sc:",sc,"ans:",ans)
-        return ans
+                                        e = d1.split('_SEQOR_')
+                                        if  len(e) > 1:
+                                            oldSeqOrOp = bitOp
+                                            bitOp = '_SEQOR_'
+                                        for e1 in e:
+                                            if e1.strip() == '':
+                                                continue
+                                            else:
+                                                f = e1.split('_SEQAND_')
+                                                if  len(f) > 1:
+                                                    oldSeqAndOp = bitOp
+                                                    bitOp = '_SEQAND_'
+                                                for f1 in f:
+                                                    if f1.strip() == '':
+                                                        continue
+                                                    else:
+                                                        ans.append(f1.strip())
+                                                        ansOp.append(bitOp)
+                                                if len(e) > 1:
+                                                    bitOp = oldSeqOrOp
+                                        if len(e) > 1:
+                                            bitOp = oldSeqOrOp
+                                if len(d) > 1:
+                                    bitOp = oldOrOp
+                        if len(c) > 1 :
+                            bitOp = oldAndOp
+        # print(msg , "sc:",sc,"ans:",ans,"ansOp:",ansOp)
+        return (ans,ansOp)
 
     def drawMap(self):
         # https://plantuml.com/ko/use-case-diagram
@@ -287,21 +591,42 @@ skinparam usecase {
             for k in self.D['Project'][p]['Key']:
                 for f in self.D['Project'][p]['Key'][k]['From']:
                     for n in self.D['Project'][p]['Key'][k]['From'][f]['_name']:
-                        plantumlbody += '    (' + n + ') --> (' + self.D['Project'][p]['Key'][k]['From'][f]['_execution'] + ') : ' + self.D['Project'][p]['Key'][k]['From'][f]['Description'] + '\n'
+                        plantumlbody += '    (' + n + ') --> (' + self.D['Project'][p]['Key'][k]['From'][f]['_execution'] + ') : desc - ' + self.D['Project'][p]['Key'][k]['From'][f]['Description'] + '\n'
                         usecaseExecutionSet.add(self.D['Project'][p]['Key'][k]['From'][f]['_execution'])
                 for f in self.D['Project'][p]['Key'][k]['To']:
                     for n in self.D['Project'][p]['Key'][k]['To'][f]['_name']:
-                        plantumlbody += '    (' + self.D['Project'][p]['Key'][k]['To'][f]['_execution'] + ') --> (' + n + ') : ' + self.D['Project'][p]['Key'][k]['To'][f]['Description'] + '\n'
+                        plantumlbody += '    (' + self.D['Project'][p]['Key'][k]['To'][f]['_execution'] + ') --> (' + n + ') : desc - ' + self.D['Project'][p]['Key'][k]['To'][f]['Description'] + '\n'
                         usecaseExecutionSet.add(self.D['Project'][p]['Key'][k]['To'][f]['_execution'])
             for u in usecaseExecutionSet:
                 totalbody += '    usecase (' + u  + ') as (' + u + ') << Execution >>\n'
             for k in self.D['Project'][p]['Key']:
                 for f in self.D['Project'][p]['Key'][k]['From']:
                     for n in self.D['Project'][p]['Key'][k]['From'][f]['_name']:
-                        totalbody += '    (' + n + ') --> (' + self.D['Project'][p]['Key'][k]['From'][f]['_execution'] + ') : ' + self.D['Project'][p]['Key'][k]['From'][f]['Description'] + '\n'
+                        desc = self.D['Project'][p]['Key'][k]['From'][f]['Description'] + '\\n'
+                        color = ''
+                        if self.D['Project'][p]['Key'][k]['From'][f]['FromType'] in ['text','binary']:
+                            print('TTT:',self.D['Project'][p]['Key'][k]['From'][f]['FromLocation'],self.D['Project'][p]['Key'][k]['From'][f].get('_FromTargetExist','666'))
+                            # if '_FromTargetExist' in self.D['Project'][p]['Key'][k]['From'][f] and self.D['Project'][p]['Key'][k]['From'][f]['_FromTargetExist'] == 'True':
+                            if self.D['Project'][p]['Key'][k]['From'][f].get('_FromTargetExist','') == True:
+                                desc += 'file exist:' + self.D['Project'][p]['Key'][k]['From'][f]['FromLocation'] +'\\n'
+                            else:
+                                desc += 'file not exist:' + self.D['Project'][p]['Key'][k]['From'][f]['FromLocation'] + '\\n'
+                        totalbody += '    (' + n + ') --> (' + self.D['Project'][p]['Key'][k]['From'][f]['_execution'] + ') ' + color + ' : desc - ' + desc + '\n'
                 for f in self.D['Project'][p]['Key'][k]['To']:
                     for n in self.D['Project'][p]['Key'][k]['To'][f]['_name']:
-                        totalbody += '    (' + self.D['Project'][p]['Key'][k]['To'][f]['_execution'] + ') --> (' + n + ') : ' + self.D['Project'][p]['Key'][k]['To'][f]['Description'] + '\n'
+                        desc = self.D['Project'][p]['Key'][k]['To'][f]['Description'] + '\\n'
+                        color = ''
+                        if self.D['Project'][p]['Key'][k]['To'][f]['ToType'] in ['text','binary']:
+                            if '_ToTargetExist' in self.D['Project'][p]['Key'][k]['To'][f] and self.D['Project'][p]['Key'][k]['To'][f]['_ToTargetExist'] == True:
+                                desc += 'file exist:' + self.D['Project'][p]['Key'][k]['To'][f]['ToLocation'] + '\\n'
+                                if self.D['Project'][p]['Key'][k]['To'][f].get('_result_ToShowCheckPoint','') != '':
+                                    a= self.D['Project'][p]['Key'][k]['To'][f].get('_result_ToShowCheckPoint','').split('\n')
+                                    desc += '\\n'.join(a) + '\\n'
+                                color += '#line:green;line.dashed;text:green'
+                            else:
+                                desc += 'file not exist:' + self.D['Project'][p]['Key'][k]['To'][f]['ToLocation'] + '\\n'
+                                color += '#line:red;line.bold;text:red'
+                        totalbody += '    (' + self.D['Project'][p]['Key'][k]['To'][f]['_execution'] + ') --> (' + n + ') ' + color + ' : desc - ' + desc + '\n'
             totalbody += '  }\n'
             plantumltail = ''
             plantumltail += '@enduml' + '\n'
