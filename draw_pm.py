@@ -23,10 +23,11 @@ from email.mime.text import MIMEText
 debug = 0
 
 class DrawProcessMap :
-    def __init__(self , input,id,passwd):
+    def __init__(self , input,id,passwd,debug):
         self.input = input
         self.id = id
         self.passwd = passwd
+        self.debug = debug
         os.makedirs('server-data',exist_ok=True)
         self.D = {}
         self.Cnt = 1
@@ -223,9 +224,12 @@ class DrawProcessMap :
                                 self.D['Project'][project]['Key'][key][direction][dir][target]  = False
                                 target = '_' + direction + 'TargetFileName'
                                 self.D['Project'][project]['Key'][key][direction][dir][target]  = targetFileName
+                                target = direction + 'LastTime'
+                                self.D['Project'][project]['Key'][key][direction][dir][target]  = grp.group('date')
                                 self.analysisLogFile(targetFileName,direction,r)
                             else:
                                 print('time expired')
+                                r[direction+'LastTime'] = grp.group('date')
                                 project = r['Project'].strip()
                                 keyStr = r['From'].strip() + '~~~' + r['Execution'].strip() + '~~~' + r['To'].strip() 
                                 key = str(self.D['Key'][keyStr])
@@ -235,7 +239,9 @@ class DrawProcessMap :
                                 target = '_' + direction + 'TargetExpired'
                                 self.D['Project'][project]['Key'][key][direction][dir][target]  = True
                                 target = '_' + direction + 'TargetFileName'
-                                self.D['Project'][project]['Key'][key][direction][dir][target]  = ""
+                                self.D['Project'][project]['Key'][key][direction][dir][target]  = targetFileName
+                                target = direction + 'LastTime'
+                                self.D['Project'][project]['Key'][key][direction][dir][target]  = grp.group('date')
                         else:  # 시간 상관없을때
                             print('no periodic')
                             r[direction+'LastTime'] = grp.group('date')
@@ -254,9 +260,12 @@ class DrawProcessMap :
                             self.D['Project'][project]['Key'][key][direction][dir][target]  = False
                             target = '_' + direction + 'TargetFileName'
                             self.D['Project'][project]['Key'][key][direction][dir][target]  = targetFileName
+                            target = direction + 'LastTime'
+                            self.D['Project'][project]['Key'][key][direction][dir][target]  = grp.group('date')
                             self.analysisLogFile(targetFileName,direction,r)
                     else :  # 파일이 없을때
                         print('file not exist')
+                        r[direction+'LastTime'] = ''
                         project = r['Project'].strip()
                         keyStr = r['From'].strip() + '~~~' + r['Execution'].strip() + '~~~' + r['To'].strip() 
                         key = str(self.D['Key'][keyStr])
@@ -295,9 +304,12 @@ class DrawProcessMap :
                                 self.D['Project'][project]['Key'][key][direction][dir][target]  = False
                                 target = '_' + direction + 'TargetFileName'
                                 self.D['Project'][project]['Key'][key][direction][dir][target]  = r[direction+'Location']
+                                target = direction + 'LastTime'
+                                self.D['Project'][project]['Key'][key][direction][dir][target]  = grp.group('date')
                                 self.analysisLogFile(r[direction+'Location'],direction,r)
                             else:
                                 project = r['Project'].strip()
+                                r[direction+'LastTime'] = grp.group('date')
                                 keyStr = r['From'].strip() + '~~~' + r['Execution'].strip() + '~~~' + r['To'].strip() 
                                 key = str(self.D['Key'][keyStr])
                                 dir = r[direction]
@@ -306,7 +318,9 @@ class DrawProcessMap :
                                 target = '_' + direction + 'TargetExpired'
                                 self.D['Project'][project]['Key'][key][direction][dir][target]  = True
                                 target = '_' + direction + 'TargetFileName'
-                                self.D['Project'][project]['Key'][key][direction][dir][target]  = ""
+                                self.D['Project'][project]['Key'][key][direction][dir][target]  = r[direction+'Location']
+                                target = direction + 'LastTime'
+                                self.D['Project'][project]['Key'][key][direction][dir][target]  = grp.group('date')
                         else:  # 시간 상관없을때
                             r[direction+'LastTime'] = grp.group('date')
                             print('date:',r[direction+'LastTime'])
@@ -320,8 +334,11 @@ class DrawProcessMap :
                             self.D['Project'][project]['Key'][key][direction][dir][target]  = False
                             target = '_' + direction + 'TargetFileName'
                             self.D['Project'][project]['Key'][key][direction][dir][target]  = r[direction+'Location']
+                            target = direction + 'LastTime'
+                            self.D['Project'][project]['Key'][key][direction][dir][target]  = grp.group('date')
                             self.analysisLogFile(r[direction+'Location'],direction,r)
                     else:   # file이 없을때
+                        r[direction+'LastTime'] = ''
                         project = r['Project'].strip()
                         keyStr = r['From'].strip() + '~~~' + r['Execution'].strip() + '~~~' + r['To'].strip() 
                         key = str(self.D['Key'][keyStr])
@@ -602,31 +619,87 @@ skinparam usecase {
             for k in self.D['Project'][p]['Key']:
                 for f in self.D['Project'][p]['Key'][k]['From']:
                     for n in self.D['Project'][p]['Key'][k]['From'][f]['_name']:
-                        desc = self.D['Project'][p]['Key'][k]['From'][f]['Description'] + '\\n'
+                        direction = 'From'
+                        ds = self.D['Project'][p]['Key'][k][direction][f]
+                        desc = ds['Description']
+                        errFlag = False
                         color = ''
-                        if self.D['Project'][p]['Key'][k]['From'][f]['FromType'] in ['text','binary']:
-                            print('TTT:',self.D['Project'][p]['Key'][k]['From'][f]['FromLocation'],self.D['Project'][p]['Key'][k]['From'][f].get('_FromTargetExist','666'))
-                            # if '_FromTargetExist' in self.D['Project'][p]['Key'][k]['From'][f] and self.D['Project'][p]['Key'][k]['From'][f]['_FromTargetExist'] == 'True':
-                            if self.D['Project'][p]['Key'][k]['From'][f].get('_FromTargetExist','') == True:
-                                desc += 'file exist:' + self.D['Project'][p]['Key'][k]['From'][f]['FromLocation'] +'\\n'
+                        if ds[direction+'Type'] in ['text','binary']:
+                            if ds.get('_'+direction+'TargetExist',False) == True:   # _ToTargetExist
+                                if self.debug:
+                                    desc += '\\nfile exist:' + ds[direction+'Location']  # ToLocation
+                                if ds.get('_ToTargetExpired',False) == True:
+                                    desc += '\\nExpired file date is ' + ds.get(direction+'LastTime',"")
+                                    errFlag = True
+                                else :
+                                    if self.debug:
+                                        desc += '\\nfile date is ' + ds.get(direction+'LastTime',"")
+                                if ds.get('_result_'+direction+'ShowCheckPoint','') != '':   # _result_ToShowCheckPoint
+                                    a= ds.get('_result_'+direction+'ShowCheckPoint','').split('\n')   # _result_ToShowCheckPoint
+                                    desc += '\\n' + '\\n'.join(a)
+                                if ds.get(direction+'FailCheckPoint','').strip() and ds.get('_final_result_'+direction+'FailCheckPoint',False) == True:  # '_final_result_ToSuccessCheckPoint'
+                                    errFlag = True
+                                    desc += '\\nError : matched Fail condition - ' + ds.get(direction+'FailCheckPoint',"")
+                                else :
+                                    if self.debug:
+                                        desc += '\\nFail condition - ' + ds.get(direction+'FailCheckPoint',"")
+                                if ds.get(direction+'SuccessCheckPoint','').strip() and ds.get('_final_result_'+direction+'SuccessCheckPoint',True) == False:  # '_final_result_ToSuccessCheckPoint'
+                                    errFlag = True
+                                    desc += '\\nError : not matched Success condition - ' + ds.get(direction+'SuccessCheckPoint',"")
+                                else :
+                                    if self.debug:
+                                        desc += '\\nSuccess condition - ' + ds.get(direction+'SuccessCheckPoint',"")
+                            elif ds[direction+'Location'] != '':
+                                desc += '\\nError file not exist:' + ds[direction+'Location']  # ToLocation
+                                errFlag = True
+
+                            if errFlag:
+                                color += '#line:red;line.bold;text:red'
                             else:
-                                desc += 'file not exist:' + self.D['Project'][p]['Key'][k]['From'][f]['FromLocation'] + '\\n'
-                        totalbody += '    (' + n + ') --> (' + self.D['Project'][p]['Key'][k]['From'][f]['_execution'] + ') ' + color + ' : desc - ' + desc + '\n'
+                                color += '#line:green;line.dashed;text:green'
+                        totalbody += '    (' + n + ') --> (' + ds['_execution'] + ') ' + color + ' : desc - ' + desc + '\n'
                 for f in self.D['Project'][p]['Key'][k]['To']:
                     for n in self.D['Project'][p]['Key'][k]['To'][f]['_name']:
-                        desc = self.D['Project'][p]['Key'][k]['To'][f]['Description'] + '\\n'
+                        direction = 'To'
+                        ds = self.D['Project'][p]['Key'][k][direction][f]
+                        desc = ds['Description']
+                        errFlag = False
                         color = ''
-                        if self.D['Project'][p]['Key'][k]['To'][f]['ToType'] in ['text','binary']:
-                            if '_ToTargetExist' in self.D['Project'][p]['Key'][k]['To'][f] and self.D['Project'][p]['Key'][k]['To'][f]['_ToTargetExist'] == True:
-                                desc += 'file exist:' + self.D['Project'][p]['Key'][k]['To'][f]['ToLocation'] + '\\n'
-                                if self.D['Project'][p]['Key'][k]['To'][f].get('_result_ToShowCheckPoint','') != '':
-                                    a= self.D['Project'][p]['Key'][k]['To'][f].get('_result_ToShowCheckPoint','').split('\n')
-                                    desc += '\\n'.join(a) + '\\n'
-                                color += '#line:green;line.dashed;text:green'
-                            else:
-                                desc += 'file not exist:' + self.D['Project'][p]['Key'][k]['To'][f]['ToLocation'] + '\\n'
+                        if ds[direction+'Type'] in ['text','binary']:
+                            if ds.get('_'+direction+'TargetExist',False) == True:   # _ToTargetExist
+                                if self.debug:
+                                    desc += '\\nfile exist:' + ds[direction+'Location']  # ToLocation
+                                if ds.get('_ToTargetExpired',False) == True:
+                                    desc += '\\nExpired file date is ' + ds.get(direction+'LastTime',"")
+                                    errFlag = True
+                                else :
+                                    if self.debug:
+                                        desc += '\\nfile date is ' + ds.get(direction+'LastTime',"")
+                                if ds.get('_result_'+direction+'ShowCheckPoint','') != '':   # _result_ToShowCheckPoint
+                                    a= ds.get('_result_'+direction+'ShowCheckPoint','').split('\n')   # _result_ToShowCheckPoint
+                                    desc += '\\n' + '\\n'.join(a)
+                                if ds.get(direction+'FailCheckPoint','').strip() and ds.get('_final_result_'+direction+'FailCheckPoint',False) == True:  # '_final_result_ToSuccessCheckPoint'
+                                    errFlag = True
+                                    desc += '\\nError : matched Fail condition - ' + ds.get(direction+'FailCheckPoint',"")
+                                else :
+                                    if self.debug:
+                                        desc += '\\nFail condition - ' + ds.get(direction+'FailCheckPoint',"")
+                                if ds.get(direction+'SuccessCheckPoint','').strip() and ds.get('_final_result_'+direction+'SuccessCheckPoint',True) == False:  # '_final_result_ToSuccessCheckPoint'
+                                    errFlag = True
+                                    desc += '\\nError : not matched Success condition - ' + ds.get(direction+'SuccessCheckPoint',"")
+                                else :
+                                    if self.debug:
+                                        desc += '\\nSuccess condition - ' + ds.get(direction+'SuccessCheckPoint',"")
+
+                            elif ds[direction+'Location'] != '':
+                                desc += '\\nError file not exist:' + ds[direction+'Location']  # ToLocation
+                                errFlag = True
+
+                            if errFlag:
                                 color += '#line:red;line.bold;text:red'
-                        totalbody += '    (' + self.D['Project'][p]['Key'][k]['To'][f]['_execution'] + ') --> (' + n + ') ' + color + ' : desc - ' + desc + '\n'
+                            else:
+                                color += '#line:green;line.dashed;text:green'
+                        totalbody += '    (' + ds['_execution'] + ') --> (' + n + ') ' + color + ' : desc - ' + desc + '\n'
             totalbody += '  }\n'
             plantumltail = ''
             plantumltail += '@enduml' + '\n'
@@ -702,10 +775,11 @@ if (__name__ == "__main__"):
         help='host passwd')
 
     parser.add_argument( '--input', default='processmap.csv',metavar="<str>", type=str, help='input csv file')
+    parser.add_argument( '--debug', default=False,action="store_true", help='for debug')
 
     args = parser.parse_args()
 
 
 
-    dpm = DrawProcessMap(input= args.input,id=args.authname,passwd=args.authpasswd)
+    dpm = DrawProcessMap(input= args.input,id=args.authname,passwd=args.authpasswd,debug=args.debug)
     dpm.drawMap()
