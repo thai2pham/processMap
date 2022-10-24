@@ -23,11 +23,15 @@ from email.mime.text import MIMEText
 debug = 0
 
 class DrawProcessMap :
-    def __init__(self , input,id,passwd,debug):
+    def __init__(self , input,id,passwd,debug,brief):
         self.input = input
         self.id = id
         self.passwd = passwd
         self.debug = debug
+        self.brief = brief
+        self.briefMax = 10
+        if self.brief:
+            self.debug = False
         os.makedirs('server-data',exist_ok=True)
         self.D = {}
         self.Cnt = 1
@@ -608,11 +612,11 @@ skinparam usecase {
             for k in self.D['Project'][p]['Key']:
                 for f in self.D['Project'][p]['Key'][k]['From']:
                     for n in self.D['Project'][p]['Key'][k]['From'][f]['_name']:
-                        plantumlbody += '    (' + n + ') --> (' + self.D['Project'][p]['Key'][k]['From'][f]['_execution'] + ') : desc - ' + self.D['Project'][p]['Key'][k]['From'][f]['Description'] + '\n'
+                        # plantumlbody += '    (' + n + ') --> (' + self.D['Project'][p]['Key'][k]['From'][f]['_execution'] + ') : desc - ' + self.D['Project'][p]['Key'][k]['From'][f]['Description'] + '\n'
                         usecaseExecutionSet.add(self.D['Project'][p]['Key'][k]['From'][f]['_execution'])
                 for f in self.D['Project'][p]['Key'][k]['To']:
                     for n in self.D['Project'][p]['Key'][k]['To'][f]['_name']:
-                        plantumlbody += '    (' + self.D['Project'][p]['Key'][k]['To'][f]['_execution'] + ') --> (' + n + ') : desc - ' + self.D['Project'][p]['Key'][k]['To'][f]['Description'] + '\n'
+                        # plantumlbody += '    (' + self.D['Project'][p]['Key'][k]['To'][f]['_execution'] + ') --> (' + n + ') : desc - ' + self.D['Project'][p]['Key'][k]['To'][f]['Description'] + '\n'
                         usecaseExecutionSet.add(self.D['Project'][p]['Key'][k]['To'][f]['_execution'])
             for u in usecaseExecutionSet:
                 totalbody += '    usecase (' + u  + ') as (' + u + ') << Execution >>\n'
@@ -622,6 +626,7 @@ skinparam usecase {
                         direction = 'From'
                         ds = self.D['Project'][p]['Key'][k][direction][f]
                         desc = ds['Description']
+                        briefDesc = ds['Description'][:self.briefMax]
                         errFlag = False
                         color = ''
                         if ds[direction+'Type'] in ['text','binary']:
@@ -630,6 +635,7 @@ skinparam usecase {
                                     desc += '\\nfile exist:' + ds[direction+'Location']  # ToLocation
                                 if ds.get('_ToTargetExpired',False) == True:
                                     desc += '\\nExpired file date is ' + ds.get(direction+'LastTime',"")
+                                    briefDesc += ':Timeout'
                                     errFlag = True
                                 else :
                                     if self.debug:
@@ -640,29 +646,37 @@ skinparam usecase {
                                 if ds.get(direction+'FailCheckPoint','').strip() and ds.get('_final_result_'+direction+'FailCheckPoint',False) == True:  # '_final_result_ToSuccessCheckPoint'
                                     errFlag = True
                                     desc += '\\nError : matched Fail condition - ' + ds.get(direction+'FailCheckPoint',"")
+                                    briefDesc += ':Fail'
                                 else :
                                     if self.debug:
                                         desc += '\\nFail condition - ' + ds.get(direction+'FailCheckPoint',"")
                                 if ds.get(direction+'SuccessCheckPoint','').strip() and ds.get('_final_result_'+direction+'SuccessCheckPoint',True) == False:  # '_final_result_ToSuccessCheckPoint'
                                     errFlag = True
                                     desc += '\\nError : not matched Success condition - ' + ds.get(direction+'SuccessCheckPoint',"")
+                                    briefDesc += ':Succ'
                                 else :
                                     if self.debug:
                                         desc += '\\nSuccess condition - ' + ds.get(direction+'SuccessCheckPoint',"")
                             elif ds[direction+'Location'] != '':
                                 desc += '\\nError file not exist:' + ds[direction+'Location']  # ToLocation
+                                briefDesc += ':notX'
                                 errFlag = True
 
                             if errFlag:
                                 color += '#line:red;line.bold;text:red'
                             else:
                                 color += '#line:green;line.dashed;text:green'
-                        totalbody += '    (' + n + ') --> (' + ds['_execution'] + ') ' + color + ' : desc - ' + desc + '\n'
+                        if self.brief:
+                            totalbody += '    (' + n + ') --> (' + ds['_execution'] + ') ' + color + ' : ' + briefDesc + '\n'
+                        else:
+                            totalbody += '    (' + n + ') --> (' + ds['_execution'] + ') ' + color + ' : desc - ' + desc + '\n'
+                        plantumlbody += '    (' + n + ') --> (' + ds['_execution'] + ') ' + color + ' : desc - ' + desc + '\n'
                 for f in self.D['Project'][p]['Key'][k]['To']:
                     for n in self.D['Project'][p]['Key'][k]['To'][f]['_name']:
                         direction = 'To'
                         ds = self.D['Project'][p]['Key'][k][direction][f]
                         desc = ds['Description']
+                        briefDesc = ds['Description'][:self.briefMax]
                         errFlag = False
                         color = ''
                         if ds[direction+'Type'] in ['text','binary']:
@@ -671,6 +685,7 @@ skinparam usecase {
                                     desc += '\\nfile exist:' + ds[direction+'Location']  # ToLocation
                                 if ds.get('_ToTargetExpired',False) == True:
                                     desc += '\\nExpired file date is ' + ds.get(direction+'LastTime',"")
+                                    briefDesc += ':Timeout'
                                     errFlag = True
                                 else :
                                     if self.debug:
@@ -681,25 +696,32 @@ skinparam usecase {
                                 if ds.get(direction+'FailCheckPoint','').strip() and ds.get('_final_result_'+direction+'FailCheckPoint',False) == True:  # '_final_result_ToSuccessCheckPoint'
                                     errFlag = True
                                     desc += '\\nError : matched Fail condition - ' + ds.get(direction+'FailCheckPoint',"")
+                                    briefDesc += ':Fail'
                                 else :
                                     if self.debug:
                                         desc += '\\nFail condition - ' + ds.get(direction+'FailCheckPoint',"")
                                 if ds.get(direction+'SuccessCheckPoint','').strip() and ds.get('_final_result_'+direction+'SuccessCheckPoint',True) == False:  # '_final_result_ToSuccessCheckPoint'
                                     errFlag = True
                                     desc += '\\nError : not matched Success condition - ' + ds.get(direction+'SuccessCheckPoint',"")
+                                    briefDesc += ':Succ'
                                 else :
                                     if self.debug:
                                         desc += '\\nSuccess condition - ' + ds.get(direction+'SuccessCheckPoint',"")
-
                             elif ds[direction+'Location'] != '':
                                 desc += '\\nError file not exist:' + ds[direction+'Location']  # ToLocation
+                                briefDesc += ':notX'
                                 errFlag = True
 
                             if errFlag:
                                 color += '#line:red;line.bold;text:red'
                             else:
                                 color += '#line:green;line.dashed;text:green'
-                        totalbody += '    (' + ds['_execution'] + ') --> (' + n + ') ' + color + ' : desc - ' + desc + '\n'
+                        
+                        if self.brief:
+                            totalbody += '    (' + ds['_execution'] + ') --> (' + n + ') ' + color + ' : ' + briefDesc + '\n'
+                        else:
+                            totalbody += '    (' + ds['_execution'] + ') --> (' + n + ') ' + color + ' : desc - ' + desc + '\n'
+                        plantumlbody += '    (' + ds['_execution'] + ') --> (' + n + ') ' + color + ' : desc - ' + desc + '\n'
             totalbody += '  }\n'
             plantumltail = ''
             plantumltail += '@enduml' + '\n'
@@ -774,12 +796,13 @@ if (__name__ == "__main__"):
         type=str,
         help='host passwd')
 
-    parser.add_argument( '--input', default='processmap.csv',metavar="<str>", type=str, help='input csv file')
+    parser.add_argument( '--input', default='processmap.csv',metavar="<csv_filename>", type=str, help='input csv file - default : processmap.csv')
     parser.add_argument( '--debug', default=False,action="store_true", help='for debug')
+    parser.add_argument( '--brief', default=False,action="store_true", help='show brief graph')
 
     args = parser.parse_args()
 
 
 
-    dpm = DrawProcessMap(input= args.input,id=args.authname,passwd=args.authpasswd,debug=args.debug)
+    dpm = DrawProcessMap(input= args.input,id=args.authname,passwd=args.authpasswd,debug=args.debug,brief=args.brief)
     dpm.drawMap()
