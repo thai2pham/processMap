@@ -3,4 +3,4 @@
 plantuml for process Map with the result of checking status
 
 # result
-- [result planguml](total.md)
+- ![result planguml](img/total.png)
