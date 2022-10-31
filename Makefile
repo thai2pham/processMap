@@ -3,9 +3,17 @@
 # change user and passwd if you use it
 
 all: 
-	python3 draw_pm.py --authname your_id --authpasswd your_passwd 
+	python3 draw_pm.py --authname your_host_id --authpasswd your_host_passwd 
 	# cp total.md ../memo
 
 debug: 
-	python3 draw_pm.py --authname your_id --authpasswd your_passwd  --debug
+	python3 draw_pm.py --authname your_host_id --authpasswd your_host_passwd  --debug
+	# cp total.md ../memo
+
+brief: 
+	python3 draw_pm.py --authname your_host_id --authpasswd your_host_passwd  --brief
+	# cp total.md ../memo
+
+collab: 
+	python3 dashboard_callab.py --authname your_collab_id --authpasswd your_collab_passwd
 	# cp total.md ../memo
