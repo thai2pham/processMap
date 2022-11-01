@@ -186,6 +186,7 @@ class DrawProcessMap :
         dateRe = re.compile('(?P<date>(?P<year>20[0-9]+)-(?P<month>[0-9]+)-(?P<day>[0-9]+))')
         for field in row:
             if field in ['FromLocation','ToLocation']:
+                row[field] = row[field].replace('[TODAY]',datetime.datetime.today().strftime('%Y-%m-%d'))
                 direction = field.replace('Location','')
                 # print(r[direction+'Type'])
                 if r[direction+'Type'] not in ['text','binary']:
