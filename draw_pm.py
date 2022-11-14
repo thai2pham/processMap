@@ -431,7 +431,7 @@ class DrawProcessMap :
                 ds[failResult] = ds[failCheck]
                 for i,v in enumerate(ds[failCheckList]):
                     for line in range(pos,len(contents)):
-                        if contents[line].find(v) >= 0:  # found
+                        if any(ck in contents[line] for ck in ds[showCheckList]) and (contents[line].find(v) >= 0):  # found
                             foundFlag = True
                             if i+1 < len(ds[failOpCheckList]):
                                 if ds[failOpCheckList][i+1].find('SEQ') < 0:  # not SEQ
@@ -451,8 +451,8 @@ class DrawProcessMap :
                 print(ds[failResult])
                 print(eval(ds[failResult]))
 
-                if ds[failFinalResult]:
-                    return
+                # if ds[failFinalResult]:
+                #     return
 
             # success checkpoint
                 # D['Project']['UTS']['Key']['11']['To']['bmw_icon_nad_log_UTS_LOG_health-service']['ToSuccessCheckPoint'] = '''Overall coverage rate: _SEQAND_ [100%] Built target all_coverage'''
@@ -479,7 +479,7 @@ class DrawProcessMap :
                 ds[successResult] = ds[successCheck]
                 for i,v in enumerate(ds[successCheckList]):
                     for line in range(pos,len(contents)):
-                        if contents[line].find(v) >= 0:  # found
+                        if any(ck in contents[line] for ck in ds[showCheckList]) and (contents[line].find(v) >= 0):  # found
                             foundFlag = True
                             if i+1 < len(ds[successOpCheckList]):
                                 if ds[successOpCheckList][i+1].find('SEQ') < 0:  # not SEQ
