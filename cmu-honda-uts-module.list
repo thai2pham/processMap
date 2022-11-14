@@ -1,0 +1,16 @@
+daqdiag-service
+remoteif-service
+someipconsumer-service
+someipprovider-service
+watchdog
+ecall-service
+ethmgr-service
+health-service
+operationmode-service
+progmgr-service
+proxysimkm-service
+remotediag-service
+interface
+updateagent-service
+v2x-service
+systemproperty
