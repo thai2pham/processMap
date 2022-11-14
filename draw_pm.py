@@ -23,12 +23,13 @@ from email.mime.text import MIMEText
 debug = 0
 
 class DrawProcessMap :
-    def __init__(self , input,id,passwd,debug,brief):
+    def __init__(self , input,id,passwd,debug,brief,local):
         self.input = input
         self.id = id
         self.passwd = passwd
         self.debug = debug
         self.brief = brief
+        self.local = local
         self.briefMax = 10
         if self.brief:
             self.debug = False
@@ -80,7 +81,7 @@ class DrawProcessMap :
                     replaceList = [i for i in r['Replace'].strip().split(',') if i.strip()]
                     for replaceItem in replaceList:
                         self.readReplaceFile(replaceItem.strip())
-                    print('self.d[Replace]:',self.D['Replace'])
+                    print('self.D[Replace]:',self.D['Replace'])
                     rList = [r]
                     rResult = []
                     for replaceItem in replaceList:   # cmu-project
@@ -194,7 +195,7 @@ class DrawProcessMap :
                 if r[direction+'Location'].strip() == '':
                     continue
                 a = row[field].strip().split(':')
-                if a[0].strip() == 'ssh':
+                if self.local == False and a[0].strip() == 'ssh':
                     hostname = a[1].strip()
                     originFileName = a[2].strip()
                     targetFileName = 'server-data/'+field+'.'+originFileName.replace('/','.')
@@ -282,9 +283,15 @@ class DrawProcessMap :
                         target = '_' + direction + 'TargetFileName'
                         self.D['Project'][project]['Key'][key][direction][dir][target]  = ""
                 else:
-                    s = '''stat -c '%y' ''' + r[direction+'Location'].strip()
+                    if self.local == True and a[0].strip() == 'ssh':
+                        hostname = a[1].strip()
+                        originFileName = a[2].strip()
+                        s = '''stat -c '%y' ''' + originFileName
+                    else :
+                        originFileName = r[direction+'Location'].strip()
+                        s = '''stat -c '%y' ''' + originFileName
                     print()
-                    print(s)
+                    print(direction,s)
                     out = os.popen(s).read()
                     print('out:',out.strip())
                     grp = dateRe.search(out)
@@ -308,10 +315,10 @@ class DrawProcessMap :
                                 target = '_' + direction + 'TargetExpired'
                                 self.D['Project'][project]['Key'][key][direction][dir][target]  = False
                                 target = '_' + direction + 'TargetFileName'
-                                self.D['Project'][project]['Key'][key][direction][dir][target]  = r[direction+'Location']
+                                self.D['Project'][project]['Key'][key][direction][dir][target]  = originFileName
                                 target = direction + 'LastTime'
                                 self.D['Project'][project]['Key'][key][direction][dir][target]  = grp.group('date')
-                                self.analysisLogFile(r[direction+'Location'],direction,r)
+                                self.analysisLogFile(originFileName,direction,r)
                             else:
                                 project = r['Project'].strip()
                                 r[direction+'LastTime'] = grp.group('date')
@@ -323,7 +330,7 @@ class DrawProcessMap :
                                 target = '_' + direction + 'TargetExpired'
                                 self.D['Project'][project]['Key'][key][direction][dir][target]  = True
                                 target = '_' + direction + 'TargetFileName'
-                                self.D['Project'][project]['Key'][key][direction][dir][target]  = r[direction+'Location']
+                                self.D['Project'][project]['Key'][key][direction][dir][target]  = originFileName
                                 target = direction + 'LastTime'
                                 self.D['Project'][project]['Key'][key][direction][dir][target]  = grp.group('date')
                         else:  # 시간 상관없을때
@@ -338,10 +345,10 @@ class DrawProcessMap :
                             target = '_' + direction + 'TargetExpired'
                             self.D['Project'][project]['Key'][key][direction][dir][target]  = False
                             target = '_' + direction + 'TargetFileName'
-                            self.D['Project'][project]['Key'][key][direction][dir][target]  = r[direction+'Location']
+                            self.D['Project'][project]['Key'][key][direction][dir][target]  = originFileName
                             target = direction + 'LastTime'
                             self.D['Project'][project]['Key'][key][direction][dir][target]  = grp.group('date')
-                            self.analysisLogFile(r[direction+'Location'],direction,r)
+                            self.analysisLogFile(originFileName,direction,r)
                     else:   # file이 없을때
                         r[direction+'LastTime'] = ''
                         project = r['Project'].strip()
@@ -800,10 +807,11 @@ if (__name__ == "__main__"):
     parser.add_argument( '--input', default='processmap.csv',metavar="<csv_filename>", type=str, help='input csv file - default : processmap.csv')
     parser.add_argument( '--debug', default=False,action="store_true", help='for debug')
     parser.add_argument( '--brief', default=False,action="store_true", help='show brief graph')
+    parser.add_argument( '--local', default=False,action="store_true", help='just use absolute path instead of ssh')
 
     args = parser.parse_args()
 
 
 
-    dpm = DrawProcessMap(input= args.input,id=args.authname,passwd=args.authpasswd,debug=args.debug,brief=args.brief)
+    dpm = DrawProcessMap(input= args.input,id=args.authname,passwd=args.authpasswd,debug=args.debug,brief=args.brief,local=args.local)
     dpm.drawMap()
